@@ -1,5 +1,10 @@
 <manifest>
-    <request>
-        <domain name="_"/>
-    </request>
+  <define>
+     <domain name="_"/>
+  </define>
+  <assign>
+    <filesystem path="/usr/bin/wrt-service" label="_" exec_label="none"/>
+    <filesystem path="/usr/lib/*" label="_" exec_label="none"/>
+    <filesystem path="/usr/share/*" label="_" exec_label="none"/>
+  </assign>
 </manifest>
