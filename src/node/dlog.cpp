@@ -49,41 +49,43 @@ static void loge(const char* tag, const char* format, ...){
     va_end(args);
 }
 
-static Handle<Value> logD(const Arguments& args){
-    HandleScope scope;
+static void logD(const FunctionCallbackInfo<Value>& args){
+    Isolate* isolate = Isolate::GetCurrent();
+    HandleScope scope(isolate);
     if( args.Length() == 1 ){
         logd(LOG_TAG, *String::Utf8Value(args[0]->ToString()));
     }else if( args.Length() > 1 ){
         logd(*String::Utf8Value(args[0]->ToString()), *String::Utf8Value(args[1]->ToString()));
     }
-    return Undefined();
+    args.GetReturnValue().Set(Undefined(isolate));
 }
 
-static Handle<Value> logV(const Arguments& args){
-    HandleScope scope;
+static void logV(const FunctionCallbackInfo<Value>& args){
+    Isolate* isolate = Isolate::GetCurrent();
+    HandleScope scope(isolate);
     if( args.Length() == 1 ){
         logv(LOG_TAG, *String::Utf8Value(args[0]->ToString()));
     }else if( args.Length() > 1 ){
         logv(*String::Utf8Value(args[0]->ToString()), *String::Utf8Value(args[1]->ToString()));
     }
-    return Undefined();
+    args.GetReturnValue().Set(Undefined(isolate));
 }
 
-static Handle<Value> logE(const Arguments& args){
-    HandleScope scope;
+static void logE(const FunctionCallbackInfo<Value>& args){
+    Isolate* isolate = Isolate::GetCurrent();
+    HandleScope scope(isolate);
     if( args.Length() == 1 ){
         loge(LOG_TAG, *String::Utf8Value(args[0]->ToString()));
     }else if( args.Length() > 1 ){
         loge(*String::Utf8Value(args[0]->ToString()), *String::Utf8Value(args[1]->ToString()));
     }
-    return Undefined();
+    args.GetReturnValue().Set(Undefined(isolate));
 }
 static void init(Handle<Object> target) {
-    HandleScope scope;
-    target->Set(String::NewSymbol("log"), v8::FunctionTemplate::New(logD)->GetFunction());
-    target->Set(String::NewSymbol("logd"), v8::FunctionTemplate::New(logD)->GetFunction());
-    target->Set(String::NewSymbol("logv"), v8::FunctionTemplate::New(logV)->GetFunction());
-    target->Set(String::NewSymbol("loge"), v8::FunctionTemplate::New(logE)->GetFunction());
+    NODE_SET_METHOD(target, "log", logD);
+    NODE_SET_METHOD(target, "logd", logD);
+    NODE_SET_METHOD(target, "logv", logV);
+    NODE_SET_METHOD(target, "loge", logE);
 }
 
 NODE_MODULE(nodedlog, init);

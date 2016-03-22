@@ -20,7 +20,6 @@
 
 #include <v8.h>
 #include <node.h>
-#include <uv.h>
 
 #include "gcontext.h"
 
@@ -31,10 +30,10 @@ namespace wrt {
 namespace service {
 
 struct poll_handler {
-	int fd;
-	uv_poll_t *uv_poll;
+    int fd;
+    uv_poll_t *uv_poll;
     int eventmask;
-	int ref;
+    int ref;
     std::list<GPollFD*> fd_list;
 };
 
@@ -49,55 +48,42 @@ void GContext::Init(){
         return;
     initialized_ = true;
 
-	GMainContext *gc = g_main_context_default();
-
-	if (!g_thread_supported())
-		g_thread_init(NULL);
+    GMainContext *gc = g_main_context_default();
 
 #if !GLIB_CHECK_VERSION(2, 35, 0)
-	g_type_init();
+    g_type_init();
 #endif
 
-	g_main_context_acquire(gc);
+    g_main_context_acquire(gc);
     context_ = g_main_context_ref(gc);
     fd_list_ = NULL;
     fd_list_size_ = 0;
     fd_count_ = 0;
 
-    uv_loop_t* main_loop = uv_default_loop();
-    if (main_loop == NULL) {
-        goto error;
-    }
 
     // allocate memory to memory
     prepare_handle_ = (uv_prepare_t*)malloc(sizeof(uv_prepare_t));
     check_handle_ = (uv_check_t*)malloc(sizeof(uv_check_t));
     timeout_handle_ = (uv_timer_t*)malloc(sizeof(uv_timer_t));
-    if (!(prepare_handle_ && check_handle_ && timeout_handle_)) {
-        goto error;
-    }
+
+    assert(prepare_handle_ != NULL);
+    assert(check_handle_ != NULL);
+    assert(timeout_handle_ != NULL);
 
     memset(prepare_handle_, 0, sizeof(uv_prepare_t));
     memset(check_handle_, 0, sizeof(uv_check_t));
-    memset(timeout_handle_, 0, sizeof(uv_timer_t)); 
+    memset(timeout_handle_, 0, sizeof(uv_timer_t));
 
-	uv_prepare_init(main_loop, prepare_handle_);
-	uv_check_init(main_loop, check_handle_);
-	uv_timer_init(main_loop, timeout_handle_);
+    uv_prepare_init(uv_default_loop(), prepare_handle_);
+    uv_check_init(uv_default_loop(), check_handle_);
+    uv_timer_init(uv_default_loop(), timeout_handle_);
 
     prepare_handle_->data = this;
     check_handle_->data = this;
     timeout_handle_->data = this;
 
-	uv_prepare_start(prepare_handle_, GContext::OnPrepare);
-	uv_check_start(check_handle_, GContext::OnCheck);
-
-    return;
-
-error:
-    free(prepare_handle_);
-    free(check_handle_);
-    free(timeout_handle_);
+    uv_prepare_start(prepare_handle_, GContext::OnPrepare);
+    uv_check_start(check_handle_, GContext::OnCheck);
 
 }
 
@@ -107,42 +93,42 @@ void GContext::Uninit(){
 
     initialized_ = false;
 
-	/* Remove all handlers */
-	std::list<poll_handler*>::iterator itr = poll_handle_list_.begin();
-	while(itr != poll_handle_list_.end()) {
-		/* Stop polling handler */
-		uv_unref((uv_handle_t *)(*itr)->uv_poll);
-		uv_poll_stop((*itr)->uv_poll);
-		uv_close((uv_handle_t *)(*itr)->uv_poll, (uv_close_cb)free);
+    /* Remove all handlers */
+    std::list<poll_handler*>::iterator itr = poll_handle_list_.begin();
+    while(itr != poll_handle_list_.end()) {
+        /* Stop polling handler */
+        uv_unref((uv_handle_t *)(*itr)->uv_poll);
+        uv_poll_stop((*itr)->uv_poll);
+        uv_close((uv_handle_t *)(*itr)->uv_poll, (uv_close_cb)free);
         delete *itr;
-		itr = poll_handle_list_.erase(itr);
-	}
+        itr = poll_handle_list_.erase(itr);
+    }
 
-	uv_unref((uv_handle_t *)check_handle_);
-	uv_unref((uv_handle_t *)prepare_handle_);
-	uv_unref((uv_handle_t *)timeout_handle_);
+    uv_unref((uv_handle_t *)check_handle_);
+    uv_unref((uv_handle_t *)prepare_handle_);
+    uv_unref((uv_handle_t *)timeout_handle_);
 
-	uv_check_stop(check_handle_);
-	uv_prepare_stop(prepare_handle_);
-	uv_timer_stop(timeout_handle_);
+    uv_check_stop(check_handle_);
+    uv_prepare_stop(prepare_handle_);
+    uv_timer_stop(timeout_handle_);
 
-	uv_close((uv_handle_t *)check_handle_, (uv_close_cb)free);
-	uv_close((uv_handle_t *)prepare_handle_, (uv_close_cb)free);
+    uv_close((uv_handle_t *)check_handle_, (uv_close_cb)free);
+    uv_close((uv_handle_t *)prepare_handle_, (uv_close_cb)free);
     uv_close((uv_handle_t *)timeout_handle_, (uv_close_cb)free);
 
     check_handle_ = NULL;
     prepare_handle_ = NULL;
     timeout_handle_ = NULL;
 
-	g_free(fd_list_);
+    g_free(fd_list_);
     fd_list_ = NULL;
 
-	/* Release GMainContext loop */
-	g_main_context_unref(context_);
+    /* Release GMainContext loop */
+    g_main_context_unref(context_);
 }
 
 static void poll_cb(uv_poll_t *uv_handle, int status, int events){
-	poll_handler *handle = static_cast<poll_handler*>(uv_handle->data);
+    poll_handler *handle = static_cast<poll_handler*>(uv_handle->data);
     if( status == 0 ){
         //printf("poll cb!!!! fd = %d, read = %d , write  = %d \n",handle->fd, events & UV_READABLE , events & UV_WRITABLE );
         std::list<GPollFD*>::iterator itr = handle->fd_list.begin();
@@ -156,50 +142,50 @@ static void poll_cb(uv_poll_t *uv_handle, int status, int events){
     }
 }
 
-void GContext::onPrepare(int status){
-	int i;
-	int timeout;
+void GContext::onPrepare(){
+    int i;
+    int timeout;
 
-	g_main_context_prepare(context_, &max_priority_);
+    g_main_context_prepare(context_, &max_priority_);
 
-	/* Getting all sources from GLib main context */
-	while(fd_list_size_ < (fd_count_ = g_main_context_query(context_,
-			max_priority_,
-			&timeout,
-			fd_list_,
-			fd_list_size_))){
-		g_free(fd_list_);
-		fd_list_size_ = fd_count_;
-		fd_list_ = g_new(GPollFD, fd_list_size_);
-	}
+    /* Getting all sources from GLib main context */
+    while(fd_list_size_ < (fd_count_ = g_main_context_query(context_,
+            max_priority_,
+            &timeout,
+            fd_list_,
+            fd_list_size_))){
+        g_free(fd_list_);
+        fd_list_size_ = fd_count_;
+        fd_list_ = g_new(GPollFD, fd_list_size_);
+    }
 
     //printf("context query : fdCount=%d , timeout = %d\n", fd_count_, timeout);
 
-	/* Poll */
-	if (fd_count_ > 0) {
-		char flagsTable[fd_count_];
+    /* Poll */
+    if (fd_count_ > 0) {
+        char flagsTable[fd_count_];
         memset(flagsTable, 0, fd_count_);
         std::list<poll_handler*>::iterator itr = poll_handle_list_.begin();
 
         //for each poll handler
-		while ( itr != poll_handle_list_.end() ) {
+        while ( itr != poll_handle_list_.end() ) {
             poll_handler *handle = *itr;
             int origin_mask = handle->eventmask;
-			handle->ref = 0;
+            handle->ref = 0;
             handle->eventmask = 0;
             handle->fd_list.clear();
 
             //check already initialized poll handles
-			for (i = 0; i < fd_count_; ++i) {
-				GPollFD *pfd = fd_list_ + i;
-				if (handle->fd == pfd->fd){
-					flagsTable[i] = 1;
-					handle->ref++;
-					pfd->revents = 0;
+            for (i = 0; i < fd_count_; ++i) {
+                GPollFD *pfd = fd_list_ + i;
+                if (handle->fd == pfd->fd){
+                    flagsTable[i] = 1;
+                    handle->ref++;
+                    pfd->revents = 0;
                     handle->eventmask |= (pfd->events & G_IO_IN ? UV_READABLE: 0) | (pfd->events & G_IO_OUT ? UV_WRITABLE: 0);
                     handle->fd_list.push_back(pfd);
-				}
-			}
+                }
+            }
 
             // remasking events
             if( handle->ref > 0){
@@ -212,25 +198,25 @@ void GContext::onPrepare(int status){
 
             // remove unused poll handles
             if( handle->ref == 0 ){
-				uv_unref((uv_handle_t *)handle->uv_poll);
-				uv_poll_stop(handle->uv_poll);
-				uv_close((uv_handle_t *)handle->uv_poll, (uv_close_cb)free);
-				itr = poll_handle_list_.erase(itr);
+                uv_unref((uv_handle_t *)handle->uv_poll);
+                uv_poll_stop(handle->uv_poll);
+                uv_close((uv_handle_t *)handle->uv_poll, (uv_close_cb)free);
+                itr = poll_handle_list_.erase(itr);
                 delete handle;
             }else{
                 ++itr;
             }
-		}
+        }
 
         std::list<poll_handler*> new_poll_fds;
-		/* Process current file descriptors from GContext */
-		for (i = 0; i < fd_count_; ++i) {
-			GPollFD *pfd = &fd_list_[i];
-			int exists = flagsTable[i];
-			if (exists)
-				continue;
+        /* Process current file descriptors from GContext */
+        for (i = 0; i < fd_count_; ++i) {
+            GPollFD *pfd = &fd_list_[i];
+            int exists = flagsTable[i];
+            if (exists)
+                continue;
 
-			pfd->revents = 0;
+            pfd->revents = 0;
             for( itr = new_poll_fds.begin(); itr != new_poll_fds.end(); ++itr){
                 poll_handler *handle = *itr;
                 if(handle->fd == pfd->fd){
@@ -248,31 +234,27 @@ void GContext::onPrepare(int status){
             if(exists)
                 continue;
 
-			/* Preparing poll handler */
-			struct poll_handler* handle = new poll_handler();
-			handle->fd = pfd->fd;
-			handle->ref = 1;
+            /* Preparing poll handler */
+            struct poll_handler* handle = new poll_handler();
+            handle->fd = pfd->fd;
+            handle->ref = 1;
 
-			/* Create uv poll handler, then append own poll handler on it */
-			uv_poll_t *pt = (uv_poll_t *)malloc(sizeof(uv_poll_t));
-            if (!pt) {
-                delete handle;
-                break;
-            }
+            /* Create uv poll handler, then append own poll handler on it */
+            uv_poll_t *pt = (uv_poll_t *)malloc(sizeof(uv_poll_t));
             memset(pt,0, sizeof(uv_poll_t));
-			pt->data = handle;
-			handle->uv_poll= pt;
+            pt->data = handle;
+            handle->uv_poll= pt;
 
-			uv_poll_init(uv_default_loop(), pt, pfd->fd);
+            uv_poll_init(uv_default_loop(), pt, pfd->fd);
             //printf("uv poll start fd = %d\n", pfd->fd);
             int uv_events = (pfd->events & G_IO_IN ? UV_READABLE: 0) | (pfd->events & G_IO_OUT ? UV_WRITABLE: 0);
             handle->eventmask = uv_events;
-			uv_poll_start(pt, uv_events, poll_cb);
+            uv_poll_start(pt, uv_events, poll_cb);
             new_poll_fds.push_back(handle);
-		}
+        }
         if( !new_poll_fds.empty() )
             poll_handle_list_.merge(new_poll_fds);
-	}
+    }
 
     if( timeout >= 0 ){
         uv_timer_start(timeout_handle_, OnTimeout, timeout, 0);
@@ -282,59 +264,57 @@ void GContext::onPrepare(int status){
 }
 
 
-void GContext::OnPrepare(uv_prepare_t *handle, int status){
+void GContext::OnPrepare(uv_prepare_t* handle){
     GContext *This = static_cast<GContext*>(handle->data);
-    This->onPrepare(status);
+    This->onPrepare();
 }
 
-void GContext::OnCheck(uv_check_t *handle, int status){
+void GContext::OnCheck(uv_check_s* handle){
     GContext* This = static_cast<GContext*>(handle->data);
-    This->onCheck(status);
+    This->onCheck();
 }
 
-void GContext::onCheck(int status){
-	int ready = g_main_context_check(context_, max_priority_, fd_list_, fd_count_);
-	if (ready){
-		g_main_context_dispatch(context_);
+void GContext::onCheck(){
+    int ready = g_main_context_check(context_, max_priority_, fd_list_, fd_count_);
+    if (ready){
+        g_main_context_dispatch(context_);
     }
 }
 
-void GContext::OnTimeout(uv_timer_t *handle, int status){
+void GContext::OnTimeout(uv_timer_s* handle){
     GContext* This = static_cast<GContext*>(handle->data);
-    This->onTimeout(status);
+    This->onTimeout();
 }
 
-void GContext::onTimeout(int status){
+void GContext::onTimeout(){
 }
 
 
 static GContext *g_context = NULL;
 
-static Handle<Value> GContextInit(const Arguments& args){
-	HandleScope scope;
+static void GContextInit(const FunctionCallbackInfo<Value>& /*args*/){
+    Isolate* isolate = Isolate::GetCurrent();
+    HandleScope scope(isolate);
 
-	if (g_context == NULL) {
-		g_context = new GContext();
-	}
+    if (g_context == NULL) {
+        g_context = new GContext();
+    }
     g_context->Init();
-	return Undefined();
 }
 
-static Handle<Value> GContextUninit(const Arguments& args){
-	HandleScope scope;
-	if (g_context != NULL) {
-		g_context->Uninit();
+static void GContextUninit(const FunctionCallbackInfo<Value>& /*args*/){
+    Isolate* isolate = Isolate::GetCurrent();
+    HandleScope scope(isolate);
+    if (g_context != NULL) {
+        g_context->Uninit();
         delete g_context;
         g_context = NULL;
-	}
-	return Undefined();
+    }
 }
 
 static void init(Handle<Object> target) {
-	HandleScope scope;
-
-	NODE_SET_METHOD(target, "init", GContextInit);
-	NODE_SET_METHOD(target, "uninit", GContextUninit);
+    NODE_SET_METHOD(target, "init", GContextInit);
+    NODE_SET_METHOD(target, "uninit", GContextUninit);
 }
 
 NODE_MODULE(gcontext, init);

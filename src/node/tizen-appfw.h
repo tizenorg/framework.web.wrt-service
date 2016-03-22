@@ -24,27 +24,25 @@
 namespace wrt {
 namespace service {
 
-class TizenAppFW{
-public:
-    static TizenAppFW& GetInstance();
+class TizenAppFW {
+ public:
+  static TizenAppFW& GetInstance();
 
-    void set_service_handler(v8::Handle<v8::Function> handler);
-    v8::Handle<v8::Function> service_handler();
-    void set_terminate_handler(v8::Handle<v8::Function> handler);
-    v8::Handle<v8::Function> terminate_handler();
+  void set_service_handler(v8::Handle<v8::Function> handler);
+  v8::Handle<v8::Function> service_handler();
+  void set_terminate_handler(v8::Handle<v8::Function> handler);
+  v8::Handle<v8::Function> terminate_handler();
 
-    void Init(int argc , char **argv);
-    void OnService(const char * bundle);
-    void OnTerminate();
+  void Init(int argc, char* argv[]);
+  void OnService(const char* bundle);
+  void OnTerminate();
+ private:
+  TizenAppFW();
+  virtual ~TizenAppFW();
 
-private:
-    TizenAppFW();
-    virtual ~TizenAppFW();
-
-    bool initialized_;
-    v8::Persistent<v8::Function> service_handler_;
-    v8::Persistent<v8::Function> terminate_handler_;
-
+  bool initialized_;
+  v8::Persistent<v8::Function> service_handler_;
+  v8::Persistent<v8::Function> terminate_handler_;
 };
 
 } // namespace service

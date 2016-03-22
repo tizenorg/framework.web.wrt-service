@@ -30,6 +30,23 @@ ENDIF(NOT CMAKE_BUILD_TYPE)
 
 ############################# compilation defines #############################
 
+IF(DEVICE_PROFILE STREQUAL "WEARABLE")
+    MESSAGE(STATUS "Device Profile: WEARABLE")
+    ADD_DEFINITIONS("-DDEVICE_PROFILE_WEARABLE")
+ELSEIF(DEVICE_PROFILE STREQUAL "MOBILE")
+    MESSAGE(STATUS "Device Profile: MOBILE")
+    ADD_DEFINITIONS("-DDEVICE_PROFILE_MOBILE")
+ELSEIF(DEVICE_PROFILE STREQUAL "TV")
+    MESSAGE(STATUS "Device Profile: TV")
+    ADD_DEFINITIONS("-DDEVICE_PROFILE_TV")
+ENDIF()
+
+############################# device arch ##################################
+
+IF(DEVICE_ARCH STREQUAL "AARCH64")
+    MESSAGE(STATUS "Device Arch: 64bit")
+    ADD_DEFINITIONS("-DDEVICE_ARCH_64_BIT")
+ENDIF(DEVICE_ARCH)
 
 ############################# compiler flags ##################################
 
@@ -54,7 +71,6 @@ ADD_DEFINITIONS("-std=c++0x")           # accept C++11x standard
 ############################# target names ####################################
 
 SET(TARGET_SERVICE "wrt-service")
-SET(TARGET_COMMON_NATIVE "wrt-common-native")
 SET(TARGET_NODE_NATIVE "native")
 SET(TARGET_NODE_GCONTEXT "gcontext")
 SET(TARGET_NODE_APPFW "appfw")
