@@ -34,13 +34,13 @@ public:
     void Uninit();
 
 private:
-    void onPrepare(int status);
-    void onCheck(int status);
-    void onTimeout(int status);
+    void onPrepare();
+    void onCheck();
+    void onTimeout();
 
-    static void OnPrepare(uv_prepare_t *handle, int status);
-    static void OnCheck(uv_check_t *handle, int status);
-    static void OnTimeout(uv_timer_t *handle, int status);
+    static void OnPrepare(uv_prepare_t* handle);
+    static void OnCheck(uv_check_s* handle);
+    static void OnTimeout(uv_timer_s* handle);
 
     bool initialized_;
     GMainContext *context_;

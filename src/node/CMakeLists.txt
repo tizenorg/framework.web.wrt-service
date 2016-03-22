@@ -1,26 +1,28 @@
 
 ADD_DEFINITIONS("-fPIC")
 
-SET(NODE_PLUGIN_PATH lib/wrt-service)
+SET(NODE_PLUGIN_PATH /usr/lib/node/wrt-service)
 
 #################################### native #####################################
 
 PKG_CHECK_MODULES(native_pkgs REQUIRED dlog nodejs)
 
 INCLUDE_DIRECTORIES (
-    ../common
+    extension
     ${native_pkgs_INCLUDE_DIRS}
 )
 
 SET(SRCS
     native-node.cpp
-    native-plugin-loader.cpp
+    extension/extension.cpp
+    extension/extension-manager.cpp
+    extension/extension-adapter.cpp
 )
 
 ADD_LIBRARY(${TARGET_NODE_NATIVE} MODULE ${SRCS})
 
 SET_TARGET_PROPERTIES(${TARGET_NODE_NATIVE} PROPERTIES PREFIX "" SUFFIX ".node")
-TARGET_LINK_LIBRARIES(${TARGET_NODE_NATIVE} ${native_pkgs_LIBRARIES} ${TARGET_COMMON_NATIVE})
+TARGET_LINK_LIBRARIES(${TARGET_NODE_NATIVE} ${native_pkgs_LIBRARIES})
 INSTALL(TARGETS ${TARGET_NODE_NATIVE} DESTINATION ${NODE_PLUGIN_PATH})
 
 #################################### gcontext #####################################
@@ -63,9 +65,11 @@ INSTALL(TARGETS ${TARGET_NODE_APPFW} DESTINATION ${NODE_PLUGIN_PATH})
 #################################### serviceutil #########################################
 PKG_CHECK_MODULES(serviceutil_pkgs REQUIRED dlog nodejs sqlite3)
 PKG_CHECK_MODULES(privilege_pkgs REQUIRED libprivilege-control)
+PKG_CHECK_MODULES(manifest_pkgs REQUIRED manifest-parser wgt-manifest-handlers)
 INCLUDE_DIRECTORIES (
     ${serviceutil_pkgs_INCLUDE_DIRS}
     ${privilege_pkgs_INCLUDE_DIRS}
+    ${manifest_pkgs_INCLUDE_DIRS}
 )
 
 SET(SRCS
@@ -75,7 +79,7 @@ SET(SRCS
 ADD_LIBRARY(${TARGET_NODE_SERVICEUTIL} MODULE ${SRCS})
 
 SET_TARGET_PROPERTIES(${TARGET_NODE_SERVICEUTIL} PROPERTIES PREFIX "" SUFFIX ".node")
-TARGET_LINK_LIBRARIES(${TARGET_NODE_SERVICEUTIL} ${privilege_pkgs_LIBRARIES} ${serviceutil_pkgs_LIBRARIES} ${TARGET_COMMON_NATIVE})
+TARGET_LINK_LIBRARIES(${TARGET_NODE_SERVICEUTIL} ${privilege_pkgs_LIBRARIES} ${serviceutil_pkgs_LIBRARIES} ${manifest_pkgs_LIBRARIES})
 INSTALL(TARGETS ${TARGET_NODE_SERVICEUTIL} DESTINATION ${NODE_PLUGIN_PATH})
 
 #################################### dlog #########################################
@@ -91,6 +95,6 @@ SET(SRCS
 ADD_LIBRARY(${TARGET_NODE_DLOG} MODULE ${SRCS})
 
 SET_TARGET_PROPERTIES(${TARGET_NODE_DLOG} PROPERTIES PREFIX "" SUFFIX ".node")
-TARGET_LINK_LIBRARIES(${TARGET_NODE_DLOG} ${nodedlog_pkgs_LIBRARIES} ${TARGET_COMMON_NATIVE})
+TARGET_LINK_LIBRARIES(${TARGET_NODE_DLOG} ${nodedlog_pkgs_LIBRARIES})
 INSTALL(TARGETS ${TARGET_NODE_DLOG} DESTINATION ${NODE_PLUGIN_PATH})
 

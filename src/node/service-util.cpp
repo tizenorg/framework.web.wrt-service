@@ -16,16 +16,22 @@
 
 #include <string.h>
 
+#include <string>
+
 #include <glib.h>
 #include <sqlite3.h>
 #include <dlog.h>
 #include <node.h>
 #include <v8.h>
+#include <memory>
 
 #include <privilege-control.h>
-#include <access-control.h>
 
-
+#include <boost/filesystem/path.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <wgt_manifest_handlers/widget_config_parser.h>
+#include <wgt_manifest_handlers/service_handler.h>
+#include <wgt_manifest_handlers/application_manifest_constants.h>
 
 #ifdef LOG_TAG
 #undef LOG_TAG
@@ -36,48 +42,53 @@ using namespace node;
 using namespace v8;
 
 namespace {
-    const char *kWrtDBPath = "/opt/dbspace/.wrt.db";
+    const char *kConfigXml = "/res/wgt/config.xml";
 }
 
 namespace wrt {
 namespace service {
 
-static std::string GetStartScript(const std::string &appid){
+static std::string GetStartScript(const std::string& appid, const std::string& rootpath){
     std::string value;
-    sqlite3 *db = NULL;
-    sqlite3_stmt *stmt = NULL;
+    std::string config_xml_path(rootpath + kConfigXml);
 
-    int ret = 0;
-    ret = sqlite3_open(kWrtDBPath, &db);
-    if( ret ){
+    if (!boost::filesystem::exists(boost::filesystem::path(config_xml_path))) {
+        LOGE("Failed to load config.xml data : No such file [%s]", config_xml_path.c_str());
         return value;
     }
 
-    const char * query = "select src from WidgetStartFile where app_id = "
-                 "(select app_id from WidgetInfo where tizen_appid = ?)"
-                 " order by start_file_id asc limit 1";
-
-    ret = sqlite3_prepare_v2(db, query, -1, &stmt, NULL);
-    ret |= sqlite3_bind_text(stmt, 1, appid.c_str(), -1, SQLITE_TRANSIENT);
-
-    if( ret )
-        goto error;
-
-    if( sqlite3_step(stmt) == SQLITE_ROW ){
-       char startfile[1024] = {0,};
-       strncpy(startfile, (char*)sqlite3_column_text(stmt, 0), 1023);
-       value = startfile;
+    std::unique_ptr<wgt::parse::WidgetConfigParser> widget_config_parser;
+    widget_config_parser.reset(new wgt::parse::WidgetConfigParser());
+    if (!widget_config_parser->ParseManifest(config_xml_path)) {
+        LOGE("Failed to load widget config parser data");
+        return value;
     }
 
-error:
-    sqlite3_finalize(stmt);
-    sqlite3_close(db);
+    std::shared_ptr<const wgt::parse::ServiceList> service_list =
+        std::static_pointer_cast<const wgt::parse::ServiceList>(
+            widget_config_parser->GetManifestData(
+                wgt::application_widget_keys::kTizenServiceKey));
+    if (!service_list)
+        return value;
+
+    for (auto& service : service_list->services) {
+        std::string svc_appid = service.id();
+        boost::filesystem::path svc_startfile = service.content();
+        if (!boost::filesystem::exists(svc_startfile)) {
+            return value;
+        } else {
+            if (!strcmp(svc_appid.c_str(), appid.c_str())) {
+                value = svc_startfile.string();
+                break;
+            }
+        }
+    }
 
     return value;
 }
 
-static void InitAce(const std::string & appid){
-    wrt::common::AccessControl::GetInstance()->InitAppPrivileges(appid);
+static void InitAce(const std::string & /*appid*/){
+    //wrt::common::AccessControl::GetInstance()->InitAppPrivileges(appid);
 }
 
 static void SetPrivilege(const std::string& pkgid, const std::string& path){
@@ -88,46 +99,46 @@ static void SetPrivilege(const std::string& pkgid, const std::string& path){
     }
 }
 
-static Handle<Value> initAce(const Arguments& args){
-    HandleScope scope;
+static void initAce(const FunctionCallbackInfo<Value>& args){
+    Isolate* isolate = Isolate::GetCurrent();
+    HandleScope scope(isolate);
+
     if( args.Length() < 1 )
-        return Undefined();
+        return;
 
     std::string appid(*String::Utf8Value(args[0]->ToString()));
     InitAce(appid);
-
-    return Undefined();
 }
 
-static Handle<Value> getStartScript(const Arguments& args){
-    HandleScope scope;
+static void getStartScript(const FunctionCallbackInfo<Value>& args){
+    Isolate* isolate = Isolate::GetCurrent();
+    HandleScope scope(isolate);
     if( args.Length() < 1 )
-        return Undefined();
+        return;
 
     std::string appid(*String::Utf8Value(args[0]->ToString()));
-    std::string start_script = GetStartScript(appid);
+    std::string rootpath(*String::Utf8Value(args[1]->ToString()));
+    std::string start_script = GetStartScript(appid, rootpath);
 
-    return String::New(start_script.c_str());
+    args.GetReturnValue().Set(String::NewFromUtf8(isolate,start_script.c_str()));
 }
 
-static Handle<Value> setPrivilege(const Arguments& args){
-    HandleScope scope;
+static void setPrivilege(const FunctionCallbackInfo<Value>& args){
+    Isolate* isolate = Isolate::GetCurrent();
+    HandleScope scope(isolate);
     if( args.Length() < 2 ){
         LOGE("No enough arguments");
-        return Undefined();
+        return;
     }
     std::string pkgid(*String::Utf8Value(args[0]->ToString()));
     std::string path(*String::Utf8Value(args[1]->ToString()));
     SetPrivilege(pkgid, path);
-
-    return Undefined();
 }
 
 static void init(Handle<Object> target) {
-    HandleScope scope;
-    target->Set(String::NewSymbol("getStartScript"), v8::FunctionTemplate::New(getStartScript)->GetFunction());
-    target->Set(String::NewSymbol("initAce"), v8::FunctionTemplate::New(initAce)->GetFunction());
-    target->Set(String::NewSymbol("setPrivilege"), v8::FunctionTemplate::New(setPrivilege)->GetFunction());
+    NODE_SET_METHOD(target, "getStartScript", getStartScript);
+    NODE_SET_METHOD(target, "initAce", initAce);
+    NODE_SET_METHOD(target, "setPrivilege", setPrivilege);
 }
 
 NODE_MODULE(serviceutil, init);
